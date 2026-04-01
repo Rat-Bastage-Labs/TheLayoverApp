@@ -1,0 +1,148 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+  <title>User Location</title>
+  <style>
+    body { 
+      font-size: 15px;
+      font-family: Arial; 
+      text-align: center; 
+      background: #eef; 
+      color: black;
+    }
+    #output { 
+      margin-top:20px; 
+    }
+  </style>
+</head>
+<body>
+  <h4>User Location</h4>
+  <div id="output">Getting location...</div>
+
+  <script>
+    const output = document.getElementById("output");
+
+    window.addEventListener("DOMContentLoaded", () => {
+
+      if (!navigator.geolocation) {
+        output.innerHTML = "Geolocation not supported.";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+          output.innerHTML = `
+            <strong>Location Retrieved</strong><br><br>
+            Latitude: ${lat}<br>
+            Longitude: ${lon}<br>
+            Timezone: ${tz}
+          `;
+        },
+        err => {
+          console.error(err);
+          output.innerHTML = "Location permission denied.";
+        }
+      );
+
+    });
+  </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Nearest Airport (OurAirports)</title>
+  <style>
+    body { font-family: Arial, text-align: center; margin-top: 2em; }
+    #output { margin-top: 1em; }
+  </style>
+</head>
+<body>
+
+<h2>Find Nearest Airport (OurAirports Data)</h2>
+<div id="output">Loading…</div>
+
+<script>
+  const output = document.getElementById("output");
+
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2)
+            + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
+            * Math.sin(dLon/2)*Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function findNearestAirport(lat, lon, airports) {
+    let nearest = null;
+    let minDist = Infinity;
+    airports.forEach(airport => {
+      const dist = getDistance(lat, lon, airport.lat, airport.lon);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = airport;
+      }
+    });
+    return {airport: nearest, distance: minDist.toFixed(2)};
+  }
+
+  async function loadAirports() {
+    output.textContent = "Fetching airport data…";
+    const resp = await fetch("https://davidmegginson.github.io/ourairports-data/airports.csv");
+    const text = await resp.text();
+    const lines = text.split("\n");
+    const headers = lines.shift().split(",");
+
+    const airports = [];
+    for (let line of lines) {
+      const cols = line.split(",");
+      if (cols.length !== headers.length) continue;
+      const type = cols[headers.indexOf("type")];
+      if (type && (type === "large_airport" || type === "medium_airport")) {
+        airports.push({
+          name: cols[headers.indexOf("name")],
+          lat: parseFloat(cols[headers.indexOf("latitude_deg")]),
+          lon: parseFloat(cols[headers.indexOf("longitude_deg")],
+        });
+      }
+    }
+    return airports;
+  }
+
+  async function run() {
+    if (!navigator.geolocation) {
+      output.textContent = "Geolocation unavailable.";
+      return;
+    }
+
+    const airports = await loadAirports();
+
+    navigator.geolocation.getCurrentPosition(pos => {
+      const {latitude, longitude} = pos.coords;
+      const nearest = findNearestAirport(latitude, longitude, airports);
+
+      output.innerHTML = `
+        <strong>Your Location</strong><br>
+        Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)}<br><br>
+        <strong>Nearest Airport</strong><br>
+        ${nearest.airport.name}<br>
+        Distance: ${nearest.distance} km
+      `;
+    }, err => {
+      output.textContent = "Location denied.";
+    });
+  }
+
+  run();
+</script>
+
+</body>
+</html>
