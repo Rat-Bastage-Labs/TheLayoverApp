@@ -43,7 +43,16 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.GsonBuilder; 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -63,9 +72,11 @@ import java.net.InetSocketAddress;
 import java.net.http.*;
 
 import java.util.*;
+import javafx.util.Duration;
 import java.util.function.Function;
 import java.util.function.Consumer;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 public class Main extends Application { 
@@ -73,7 +84,15 @@ public class Main extends Application {
         Optional.ofNullable(System.getenv("AIRPORTS_CSV_URL"))
                 .orElse(System.getenv("AIRPORTS_CSV_DEF"));
     private static final String AVIATIONSTACK_KEY = System.getenv("AVIATIONSTACK_KEY");
+    private static final String AVIATIONSTACK_URL = System.getenv("AVIATIONSTACK_URL");
+    private static final Set<String> ALLOWED_AIRLINES = Set.of(
+        "AA","DL","UA","WN","NK","F9","AS","B6",
+        "AC","AM","WS","AF","BA","LH","EK","QR","CX","IB","KL"
+    );
     private HttpServer server;
+    
+    private static volatile double lastLat = 0;
+    private static volatile double lastLon = 0;
 
     private static final List<String> lobbyTitles = List.of(
         "Quick Activities",
@@ -169,6 +188,22 @@ public class Main extends Application {
     column.setCellValueFactory(data ->
             new SimpleStringProperty(mapper.apply(data.getValue()))
     );
+
+        column.setCellFactory(tc -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                }
+
+                setAlignment(Pos.CENTER); 
+            }
+        });
+        
     return column;
     }
 
@@ -324,7 +359,7 @@ public class Main extends Application {
         stage.show();
         stage.setOnCloseRequest(e -> saveUserData());
 
-        new Thread(this::startServer).start();
+        new Thread(this::startServer).start(); 
     }
 
     private Hyperlink navLink(String text) {
@@ -708,12 +743,28 @@ public class Main extends Application {
 
         StackPane headerBox = new StackPane();
         headerBox.setPadding(new Insets(0, 20, 0, 20));
-        headerBox.setPrefHeight(40); 
+        headerBox.setPrefHeight(40);
 
         Label topLabel = new Label("Fetching nearest airport...");
         topLabel.setFont(Font.font(14));
         topLabel.setStyle("-fx-font-weight: bold;");
         StackPane.setAlignment(topLabel, Pos.CENTER);
+
+        Button refreshBtn = new Button("Refresh");
+        refreshBtn.setStyle("""
+            -fx-background-radius: 20;
+            -fx-padding: 6 14;
+            -fx-background-color: #8EC5FC;
+            -fx-text-fill: white;
+            -fx-font-weight: bold;
+        """);
+
+        refreshBtn.setOnAction(e -> {
+            topLabel.setText("Refreshing location...");
+            root.setCenter(createFlightsPage());
+        });
+
+        StackPane.setAlignment(refreshBtn, Pos.CENTER_LEFT);
 
         ToggleButton toggle = new ToggleButton("Arrivals");
         toggle.setSelected(true);
@@ -726,18 +777,18 @@ public class Main extends Application {
         """);
 
         StackPane.setAlignment(toggle, Pos.CENTER_RIGHT);
-        headerBox.getChildren().addAll(topLabel, toggle);
+        headerBox.getChildren().addAll(topLabel, toggle, refreshBtn);
 
         TableView<FlightRow> localTable = new TableView<>();
         ObservableList<FlightRow> arrivalsData = FXCollections.observableArrayList();
         ObservableList<FlightRow> departuresData = FXCollections.observableArrayList();
 
-        localTable.setItems(arrivalsData); 
+        localTable.setItems(arrivalsData);
         localTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         localTable.setPrefHeight(500);
         localTable.setStyle(
-            "-fx-focus-color: transparent; " +   
-            "-fx-faint-focus-color: transparent;" 
+            "-fx-focus-color: transparent; " +
+            "-fx-faint-focus-color: transparent;"
         );
 
         localTable.getColumns().addAll(
@@ -773,9 +824,41 @@ public class Main extends Application {
                                         Double.parseDouble(a.get("longitude_deg")))))
                         .orElseThrow();
 
-                Platform.runLater(() -> topLabel.setText(
-                        nearest.get("name") + " (" + nearest.get("iata_code") + ")"
-                ));
+                String airportName = nearest.get("name");
+                String iata = nearest.get("iata_code");
+
+                Platform.runLater(() -> topLabel.setText(airportName + " (" + iata + ")"));
+
+                Map<String, List<Map<String, String>>> flights = fetchFlights(iata);
+
+                Platform.runLater(() -> {
+                    arrivalsData.clear();
+                    departuresData.clear();
+
+                    flights.getOrDefault("arrivals", Collections.emptyList())
+                           .forEach(f -> arrivalsData.add(new FlightRow(
+                               f.getOrDefault("flight", "—"),
+                               f.getOrDefault("airline", "—"),
+                               f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
+                               f.getOrDefault("status", "Unknown"),
+                               f.getOrDefault("scheduled", "—"),
+                               f.getOrDefault("estimated", "—"),
+                               f.getOrDefault("terminal", "—"),
+                               f.getOrDefault("gate", "—")
+                           )));
+
+                    flights.getOrDefault("departures", Collections.emptyList())
+                           .forEach(f -> departuresData.add(new FlightRow(
+                               f.getOrDefault("flight", "—"),
+                               f.getOrDefault("airline", "—"),
+                               f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
+                               f.getOrDefault("status", "Unknown"),
+                               f.getOrDefault("scheduled", "—"),
+                               f.getOrDefault("estimated", "—"),
+                               f.getOrDefault("terminal", "—"),
+                               f.getOrDefault("gate", "—")
+                           )));
+                });
 
                 return null;
             }
@@ -785,6 +868,153 @@ public class Main extends Application {
 
         new Thread(task).start();
         return pageBox;
+    }
+
+    public static Map<String, List<Map<String, String>>> fetchFlights(String iata) throws IOException {
+        List<Map<String, String>> arrivals = new ArrayList<>();
+        List<Map<String, String>> departures = new ArrayList<>(); 
+
+        fetchAndAdd(AVIATIONSTACK_URL + "?dep_iata=" + iata + "&access_key=" + AVIATIONSTACK_KEY, departures, true);
+        fetchAndAdd(AVIATIONSTACK_URL + "?arr_iata=" + iata + "&access_key=" + AVIATIONSTACK_KEY, arrivals, true);
+ 
+        return Map.of("arrivals", arrivals, "departures", departures);
+    }
+ 
+
+    private static void fetchAndAdd(String url, List<Map<String, String>> target, boolean arrival) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setRequestMethod("GET");
+
+        int code = conn.getResponseCode();
+        InputStream stream = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+        String response = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+
+        if (code != 200) {
+            System.out.println("ERROR RESPONSE:\n" + response);
+            throw new IOException("API Error: HTTP " + code);
+        }
+
+        Gson gson = new Gson();
+        JsonObject root = gson.fromJson(response, JsonObject.class);
+
+        if (root.has("error")) {
+            System.out.println("API ERROR:\n" + root.get("error"));
+            throw new IOException("API returned error");
+        }
+
+        JsonArray data = root.getAsJsonArray("data");
+        if (data == null || data.size() == 0) {
+            System.out.println("No flight data returned.");
+            return;
+        }
+
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zone);
+        ZonedDateTime now = ZonedDateTime.now(zone);
+
+        for (JsonElement elem : data) {
+            if (!elem.isJsonObject()) continue;
+            JsonObject f = elem.getAsJsonObject();
+
+            JsonObject flightObj = getObj(f, "flight");
+            JsonObject airlineObj = getObj(f, "airline");
+            JsonObject depObj = getObj(f, "departure");
+            JsonObject arrObj = getObj(f, "arrival");
+
+            JsonObject timeObj = arrival ? arrObj : depObj;
+            if (timeObj == null) continue;
+
+            String flightNum = getString(flightObj, "iata");
+            String airline = getString(airlineObj, "name");
+            String airlineCode = getString(airlineObj, "iata");
+            String from = getString(depObj, "iata");
+            String to = getString(arrObj, "iata");
+            
+            if (flightNum.isBlank() || airline.isBlank()) continue;
+            
+            String scheduledRaw = getString(timeObj, "scheduled");
+            String estimatedRaw = getString(timeObj, "estimated");
+            String terminal = getString(timeObj, "terminal");
+            String gate = getString(timeObj, "gate");
+
+            if (scheduledRaw.isEmpty()) continue;
+
+            ZonedDateTime flightTime;
+            try {
+                flightTime = OffsetDateTime.parse(scheduledRaw).atZoneSameInstant(zone);
+            } catch (Exception e) {
+                continue;
+            }
+            
+            if (flightTime.isBefore(now.minusHours(24)) || flightTime.isAfter(now.plusHours(24))) {
+                continue;
+            } 
+
+            String statusRaw = getString(f, "flight_status").toLowerCase();
+            if (statusRaw.equals("cancelled")) continue;
+
+            if (!ALLOWED_AIRLINES.isEmpty() && !airlineCode.isEmpty()
+                    && !ALLOWED_AIRLINES.contains(airlineCode)) {
+                continue;
+            }
+
+            String scheduled = formatTime(scheduledRaw);
+            String estimated = formatTime(estimatedRaw);
+
+            Map<String, String> flight = new HashMap<>();
+            flight.put("flight", emptyDash(flightNum));
+            flight.put("airline", emptyDash(airline));
+            flight.put("from", emptyDash(from));
+            flight.put("to", emptyDash(to));
+            flight.put("status", formatStatus(statusRaw));
+            flight.put("scheduled", scheduled);
+            flight.put("estimated", estimated);
+            flight.put("terminal", emptyDash(terminal));
+            flight.put("gate", emptyDash(gate));
+
+            target.add(flight);
+        }
+
+    }
+
+    private static JsonObject getObj(JsonObject obj, String key) {
+        return (obj != null && obj.has(key) && obj.get(key).isJsonObject())
+                ? obj.getAsJsonObject(key)
+                : null;
+    }
+
+    private static String getString(JsonObject obj, String key) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return "";
+        }
+        return obj.get(key).getAsString();
+    }
+
+    private static String emptyDash(String s) {
+        return (s == null || s.isBlank()) ? "—" : s;
+    }
+
+    private static String formatTime(String iso) {
+        if (iso == null || iso.isBlank()) return "—";
+        try {
+            ZonedDateTime zdt = OffsetDateTime.parse(iso)
+                    .atZoneSameInstant(ZoneId.systemDefault());
+            return zdt.format(DateTimeFormatter.ofPattern("hh:mm a"));
+        } catch (Exception e) {
+            return "—";
+        }
+    }
+
+    private static String formatStatus(String status) {
+        switch (status) {
+            case "scheduled": return "On Time";
+            case "active": return "En Route";
+            case "landed": return "Arrived";
+            case "delayed": return "Delayed";
+            case "cancelled": return "Cancelled";
+            case "diverted": return "Diverted";
+            default: return status.isEmpty() ? "Unknown" : status.substring(0,1).toUpperCase() + status.substring(1);
+        }
     }
 
     private String currentSortKey = null;
@@ -955,7 +1185,7 @@ public class Main extends Application {
 
                 link.setOnAction(ev -> {
                     link.setVisited(false);
-                    System.out.println("Airport clicked: " + text + " -> " + url);
+                    System.out.println("\nAirport clicked: \n" + text + " -> " + url);
                 });
 
                 grid.add(link, c, r + 1);
@@ -979,7 +1209,8 @@ public class Main extends Application {
                 mapLink.setOnAction(ev -> {
                     mapLink.setVisited(false); 
                     String mapsUrl = "https://www.google.com/maps/@" + lat + "," + lon + ",14z";
-                    System.out.println("Opening in browser: " + mapsUrl);
+                    System.out.println("\nOpening map link in browser:");
+                    System.out.println(text + " -> " + mapsUrl);
                 });
 
                 grid.add(mapLink, c, r + 1);
@@ -1353,28 +1584,9 @@ public class Main extends Application {
         return box;
     }      
 
-    private double[] fetchUserLocation() throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://ipapi.co/json/"))
-                .GET()
-                .build();
-
-        HttpResponse<String> response =
-                client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch IP location");
-        }
-
-        com.google.gson.Gson gson = new com.google.gson.Gson();
-        Map<?, ?> json = gson.fromJson(response.body(), Map.class);
-
-        double lat = ((Number) json.get("latitude")).doubleValue();
-        double lon = ((Number) json.get("longitude")).doubleValue();
-    
-        return new double[]{lat, lon};
-    } 
+    private double[] fetchUserLocation() { 
+        return new double[]{lastLat, lastLon};
+    }
 
     private List<Map<String, String>> fetchAirportsCSV() throws Exception {
         URL url = new URL(AIRPORTS_CSV_URL); 
@@ -2431,20 +2643,36 @@ public class Main extends Application {
 
     private void startServer() {
         try {
-            String portEnv = System.getenv("PORT");
-            String hostEnv = System.getenv("HOST");
-
-            int port = (portEnv != null) ? Integer.parseInt(portEnv) : 8080;
-            String host = (hostEnv != null) ? hostEnv : "localhost";
-
-            server = HttpServer.create(new InetSocketAddress(host, port), 0);
+            int port = 8080;
+            server = HttpServer.create(new InetSocketAddress(port), 0);
 
             server.createContext("/", new StaticFileHandler());
 
+            server.createContext("/location", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+
+                        Gson gson = new Gson();
+                        Map<?, ?> json = gson.fromJson(body, Map.class);
+                        lastLat = ((Number) json.get("lat")).doubleValue();
+                        lastLon = ((Number) json.get("lon")).doubleValue();
+
+                        String response = "Location received";
+                        exchange.sendResponseHeaders(200, response.length());
+                        exchange.getResponseBody().write(response.getBytes());
+                        exchange.close();
+                    } else {
+                        exchange.sendResponseHeaders(405, -1); 
+                    }
+                }
+            });
+
             server.setExecutor(null); 
             server.start();
-
-            System.out.println("Server running at http://" + host + ":" + port);
+            System.out.println("Server running at http://localhost:" + port);
 
         } catch (IOException e) {
             e.printStackTrace();
