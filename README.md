@@ -8,10 +8,9 @@
 ---
 ##### A JavaFX-based social travel application designed to help travelers connect, explore airport information, and discover real-time flight data during layovers.
 ---
-#### Overview: 
+#### <ins>Overview:</ins> 
 
 ##### The Layover App enhances the airport experience by combining:
-##### - Social interaction between travelers
 ##### - Social interaction between travelers
 ##### - Real-time flight tracking
 ##### - Global airport exploration
@@ -19,7 +18,7 @@
 
 ##### Built with JavaFX, the app provides a modern UI and a unique swipe-based connection experience for users during layovers.
 ---
-#### Features:
+#### <ins>Features:</ins>
 ##### - Social interaction between travelers
 ##### - Smart Navigation
 ##### - Central “Find” hub for:
@@ -28,14 +27,14 @@
 ##### - Airports
 ##### -  Scroll + click interaction for quick switching
 ---
-#### Meet Travelers:
+#### <ins>Meet Travelers:</ins>
 ##### - Swipe-style matching system (like Tinder)
 ##### - Randomized traveler profiles
 ##### - Match rewards system (+1 or +2 meetups)
 ##### - Profile overlays with animations
 ##### - Match history tracking
 ---
-#### Profile System: 
+#### <ins>Profile System:</ins> 
 ##### - Editable user profile:
 ##### - Display name
 ##### - Username
@@ -47,7 +46,7 @@
 ##### - Unmatch option
 ##### - Report/block system
 ---
-#### Airport Explorer:
+#### <ins>Airport Explorer:</ins>
 ##### - Loads global airport data via CSV
 ##### - Sortable columns:
 ##### - Name
@@ -55,11 +54,11 @@
 ##### - City
 ##### - Country
 ##### - Continent
-##### Clickable:
+##### <ins>Clickable:</ins>
 ##### - Airport websites
 ##### - Google Maps locations
 ---
-#### Flight Tracking: 
+#### <ins>Flight Tracking:</ins> 
 ##### - Real-time arrivals & departures
 ##### - Filters by:
 ##### - Airline whitelist
@@ -71,12 +70,12 @@
 ##### - Gate & terminal
 ##### - Toggle between arrivals/departures
 ---
-#### Location-Based Features: 
+#### <ins>Location-Based Features:</ins> 
 ##### - Local HTTP server (port 8080)
 ##### - Receives browser geolocation
 ##### - Calculates nearest airport using Haversine formula
 ---
-#### Lobby System: 
+#### <ins>Lobby System:</ins> 
 ##### - Activity categories like:
 ##### - Chill & Chat
 ##### - Food & Drink
@@ -85,18 +84,56 @@
 ##### - Interactive cards with animations
 ##### - Quick match entry points
 ---
-#### Safety & Legal: 
+#### <ins>Safety & Legal:</ins> 
 ##### - Required agreement before meeting users:
 ##### - Age confirmation (18+)
 ##### - Terms acknowledgment
 ##### - Built-in legal disclaimer page
 ##### - Report & block functionality
 --- 
-#### Tech Stack: 
+#### <ins>Tech Stack:</ins> 
 ##### - Java 17+
 ##### - JavaFX
 ##### - Gson (JSON handling)
 ##### - HttpServer (local backend)
 ##### - AviationStack API (flight data)
 ##### - CSV parsing (airport dataset)
+---
+#### <ins>Environment Variables</ins>
+
+##### Set the following before running:
+```
+AVIATIONSTACK_KEY=your_api_key
+AVIATIONSTACK_URL=http://api.aviationstack.com/v1/flights
+AIRPORTS_CSV_URL=https://your-airports-dataset.csv
+```
+---
+#### <ins>Running the App</ins>
+##### - 1. Clone the repo
+```
+git clone https://github.com/inglorious-ratbastard/TheLayoverApp.git
+cd layover-app
+```
+##### - 2. Compile & Run
+```
+javac Main.java
+java Main
+```
+##### - 3. Enable Location (Optional)
+##### Open index.html served at:
+```
+http://localhost:8080 
+```
+##### Allows location access to enable nearest airport detection
+--- 
+##### <ins>Disclaimer</ins>
+##### This app is a social coordination tool only.
+##### - No identity verification is performed
+##### - Users meet at their own risk
+##### - Not affiliated with airports, airlines, or government agencies
+---
+##### <ins>Author</ins>
+##### Javier Yzaguirre
+##### © 2026 All Rights Reserved
+##### Unauthorized copying or distribution is prohibited. 
 ---
