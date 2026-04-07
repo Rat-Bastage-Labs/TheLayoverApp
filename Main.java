@@ -156,19 +156,15 @@ public class Main extends Application {
         )
     );
 
-    public static class FlightRow {
-        public String flight;
-        public String airline;
-        public String fromTo;
-        public String status;
-        public String scheduled;
-        public String estimated;
-        public String terminal;
-        public String gate;
+    class FlightRow {
+        String flight, airline, fromTo, status, scheduled, estimated, terminal, gate;
+        ZonedDateTime scheduledTime; 
 
-        public FlightRow(String flight, String airline, String fromTo,
-                         String status, String scheduled, String estimated,
-                         String terminal, String gate) {
+        public FlightRow(String flight, String airline, String fromTo, String status,
+                         String scheduled, String estimated,
+                         String terminal, String gate,
+                         ZonedDateTime scheduledTime) {
+
             this.flight = flight;
             this.airline = airline;
             this.fromTo = fromTo;
@@ -177,6 +173,7 @@ public class Main extends Application {
             this.estimated = estimated;
             this.terminal = terminal;
             this.gate = gate;
+            this.scheduledTime = scheduledTime;
         }
     }
 
@@ -836,28 +833,41 @@ public class Main extends Application {
                     departuresData.clear();
 
                     flights.getOrDefault("arrivals", Collections.emptyList())
-                           .forEach(f -> arrivalsData.add(new FlightRow(
-                               f.getOrDefault("flight", "—"),
-                               f.getOrDefault("airline", "—"),
-                               f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
-                               f.getOrDefault("status", "Unknown"),
-                               f.getOrDefault("scheduled", "—"),
-                               f.getOrDefault("estimated", "—"),
-                               f.getOrDefault("terminal", "—"),
-                               f.getOrDefault("gate", "—")
-                           )));
+                           .forEach(f -> {
+                               ZonedDateTime scheduledTime = ZonedDateTime.parse(f.get("scheduledTime"));
+
+                               arrivalsData.add(new FlightRow(
+                                   f.getOrDefault("flight", "—"),
+                                   f.getOrDefault("airline", "—"),
+                                   f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
+                                   f.getOrDefault("status", "Unknown"),
+                                   f.getOrDefault("scheduled", "—"),
+                                   f.getOrDefault("estimated", "—"),
+                                   f.getOrDefault("terminal", "—"),
+                                   f.getOrDefault("gate", "—"),
+                                   scheduledTime
+                               ));
+                           });
 
                     flights.getOrDefault("departures", Collections.emptyList())
-                           .forEach(f -> departuresData.add(new FlightRow(
-                               f.getOrDefault("flight", "—"),
-                               f.getOrDefault("airline", "—"),
-                               f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
-                               f.getOrDefault("status", "Unknown"),
-                               f.getOrDefault("scheduled", "—"),
-                               f.getOrDefault("estimated", "—"),
-                               f.getOrDefault("terminal", "—"),
-                               f.getOrDefault("gate", "—")
-                           )));
+                           .forEach(f -> {
+                               ZonedDateTime scheduledTime = ZonedDateTime.parse(f.get("scheduledTime"));
+
+                               departuresData.add(new FlightRow(
+                                   f.getOrDefault("flight", "—"),
+                                   f.getOrDefault("airline", "—"),
+                                   f.getOrDefault("from", "—") + " → " + f.getOrDefault("to", "—"),
+                                   f.getOrDefault("status", "Unknown"),
+                                   f.getOrDefault("scheduled", "—"),
+                                   f.getOrDefault("estimated", "—"),
+                                   f.getOrDefault("terminal", "—"),
+                                   f.getOrDefault("gate", "—"),
+                                   scheduledTime
+                               ));
+                           });
+
+                    arrivalsData.sort(Comparator.comparing(r -> r.scheduledTime));
+                    departuresData.sort(Comparator.comparing(r -> r.scheduledTime));
                 });
 
                 return null;
@@ -971,6 +981,7 @@ public class Main extends Application {
             flight.put("estimated", estimated);
             flight.put("terminal", emptyDash(terminal));
             flight.put("gate", emptyDash(gate));
+            flight.put("scheduledTime", flightTime.toString());
 
             target.add(flight);
         }
