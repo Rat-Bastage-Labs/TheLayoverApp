@@ -777,6 +777,36 @@ public class Main extends Application {
         headerBox.getChildren().addAll(topLabel, toggle, refreshBtn);
 
         TableView<FlightRow> localTable = new TableView<>();
+
+        localTable.setRowFactory(tv -> new TableRow<>() {
+            @Override
+            protected void updateItem(FlightRow row, boolean empty) {
+                super.updateItem(row, empty);
+
+                if (row == null || empty) {
+                    setStyle("");
+                    return;
+                }
+
+                switch (row.status.toLowerCase()) {
+                    case "delayed":
+                        setStyle("-fx-background-color: #ffe5e5;"); 
+                        break;
+                    case "en route":
+                        setStyle("-fx-background-color: #e6f0ff;"); 
+                        break;
+                    case "arrived":
+                        setStyle("-fx-background-color: #e6ffe6;"); 
+                        break;
+                    case "on time":
+                        setStyle("-fx-background-color: #f5f5f5;");
+                        break;
+                    default:
+                        setStyle("");
+                }
+            }
+        });
+        
         ObservableList<FlightRow> arrivalsData = FXCollections.observableArrayList();
         ObservableList<FlightRow> departuresData = FXCollections.observableArrayList();
 
