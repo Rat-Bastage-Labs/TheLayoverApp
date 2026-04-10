@@ -776,7 +776,7 @@ public class Main extends Application {
         StackPane.setAlignment(toggle, Pos.CENTER_RIGHT);
         headerBox.getChildren().addAll(topLabel, toggle, refreshBtn);
 
-        TableView<FlightRow> localTable = new TableView<>();
+        TableView<FlightRow> localTable = new TableView<>(); 
 
         localTable.setRowFactory(tv -> new TableRow<>() {
             @Override
@@ -788,21 +788,33 @@ public class Main extends Application {
                     return;
                 }
 
+                String baseColor;
+
                 switch (row.status.toLowerCase()) {
                     case "delayed":
-                        setStyle("-fx-background-color: #ffe5e5;"); 
+                        baseColor = "#ffe5e5";
                         break;
                     case "en route":
-                        setStyle("-fx-background-color: #e6f0ff;"); 
+                        baseColor = "#e6f0ff";
                         break;
                     case "arrived":
-                        setStyle("-fx-background-color: #e6ffe6;"); 
+                        baseColor = "#e6ffe6";
                         break;
                     case "on time":
-                        setStyle("-fx-background-color: #f5f5f5;");
+                        baseColor = "#f5f5f5";
                         break;
                     default:
-                        setStyle("");
+                        baseColor = "white";
+                }
+
+                if (isSelected()) {
+                    setStyle(
+                        "-fx-background-color: #4a90e2;" + 
+                        "-fx-text-fill: white;" +
+                        "-fx-opacity: 0.8;"
+                    );
+                } else {
+                    setStyle("-fx-background-color: " + baseColor + "; -fx-text-fill: black;");
                 }
             }
         });
