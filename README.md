@@ -105,7 +105,7 @@
 ```
 AVIATIONSTACK_KEY=your_api_key
 AVIATIONSTACK_URL=http://api.aviationstack.com/v1/flights
-AIRPORTS_CSV_URL=https://your-airports-dataset.csv
+AIRPORTS_CSV_URL=https://davidmegginson.github.io/ourairports-data/airports.csv
 ```
 ---
 #### <ins>Running the App</ins>
